@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url  = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  documents  Document[]
+  signatures Signature[]
+  auditLogs  AuditLog[]
+}
+
+model Document {
+  id           String         @id @default(cuid())
+  filename     String
+  originalName String
+  fileUrl      String
+  publicId     String         // Cloudinary public ID (needed to delete files)
+  status       DocumentStatus @default(PENDING)
+  pages        Int            @default(1)
+  size         Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  owner      User        @relation(fields: [ownerId], references: [id])
+  ownerId    String
+
+  signatures Signature[]
+  auditLogs  AuditLog[]
+}
+
+model Signature {
+  id         String          @id @default(cuid())
+  x          Float
+  y          Float
+  page       Int
+  width      Float           @default(200)
+  height     Float           @default(60)
+  imageData  String?         // base64 of drawn signature
+  status     SignatureStatus @default(PLACED)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  document   Document @relation(fields: [documentId], references: [id])
+  documentId String
+
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  ipAddress  String      @default("")
+  userAgent  String      @default("")
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+
+  document   Document @relation(fields: [documentId], references: [id])
+  documentId String
+
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+}
+
+enum DocumentStatus {
+  PENDING
+  SIGNED
+  EXPIRED
+}
+
+enum SignatureStatus {
+  PLACED
+  SIGNED
+}
+
+enum AuditAction {
+  DOCUMENT_UPLOADED
+  DOCUMENT_VIEWED
+  SIGNATURE_PLACED
+  DOCUMENT_SIGNED
+  DOCUMENT_SHARED
+}
