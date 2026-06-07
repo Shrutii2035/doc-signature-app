@@ -4,7 +4,8 @@ import cors from 'cors'
 import cookieParser from 'cookie-parser' 
 import { errorHandler } from './middleware/errorHandler'
 import authRoutes from './routes/auth'
-
+import docRoutes from './routes/docs'        
+   
 const app = express()
 const PORT = process.env.PORT || 5000
 
@@ -26,7 +27,8 @@ app.get('/api/health', (_req, res) => {
   })
 })
 
-
+app.use('/api/auth', authRoutes)
+app.use('/api/docs', docRoutes) 
 // 404
 app.use('/api/auth', authRoutes) 
 app.use((_req, res) => {
