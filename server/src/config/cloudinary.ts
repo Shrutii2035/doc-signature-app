@@ -14,9 +14,10 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: 'doc-signature/documents', // folder name in your Cloudinary dashboard
+    folder:        'doc-signature/documents',
     allowed_formats: ['pdf'],
-    resource_type: 'raw',              // 'raw' is required for PDFs
+    resource_type: 'raw',
+    access_mode:   'public',      
   } as object,
 })
 

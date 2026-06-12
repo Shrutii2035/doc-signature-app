@@ -3,23 +3,22 @@ import { prisma }                          from '../config/prisma'
 import { cloudinary }                      from '../config/cloudinary'
 import { AuthRequest }                     from '../middleware/auth'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import fetch                               from 'node-fetch'
+
 // ── SAVE SIGNATURE POSITION ───────────────────────────────
-// This saves WHERE on the PDF the signature should go
 export const saveSignature = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.userId
     const { documentId, x, y, page, width, height } = req.body
 
-    // Validate all required fields
     if (!documentId || x === undefined || y === undefined || !page) {
       res.status(400).json({
         success: false,
         message: 'documentId, x, y and page are required'
       })
       return
-    }
+    } 
 
-    // Make sure the document exists and belongs to this user
     const document = await prisma.document.findUnique({
       where: { id: documentId }
     })
@@ -34,7 +33,6 @@ export const saveSignature = async (req: AuthRequest, res: Response): Promise<vo
       return
     }
 
-    // Save the signature position to database
     const signature = await prisma.signature.create({
       data: {
         documentId,
@@ -44,11 +42,10 @@ export const saveSignature = async (req: AuthRequest, res: Response): Promise<vo
         page:   Number(page),
         width:  Number(width)  || 200,
         height: Number(height) || 60,
-        status: 'PLACED',      // just placed, not signed yet
+        status: 'PLACED',
       }
     })
 
-    // Add to audit log
     await prisma.auditLog.create({
       data: {
         documentId,
@@ -72,13 +69,11 @@ export const saveSignature = async (req: AuthRequest, res: Response): Promise<vo
 }
 
 // ── GET SIGNATURES FOR A DOCUMENT ────────────────────────
-// Returns all signature positions for a specific document
 export const getSignatures = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const docId  = String(req.params.docId)
     const userId = req.user!.userId
 
-    // Verify document ownership
     const document = await prisma.document.findUnique({
       where: { id: docId }
     })
@@ -108,36 +103,6 @@ export const getSignatures = async (req: AuthRequest, res: Response): Promise<vo
   }
 }
 
-// ── DELETE A SIGNATURE POSITION ───────────────────────────
-// Removes a signature placeholder (before finalizing)
-export const deleteSignature = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const id     = String(req.params.id)
-    const userId = req.user!.userId
-
-    const signature = await prisma.signature.findUnique({
-      where: { id }
-    })
-
-    if (!signature) {
-      res.status(404).json({ success: false, message: 'Signature not found' })
-      return
-    }
-
-    if (signature.userId !== userId) {
-      res.status(403).json({ success: false, message: 'Not authorized' })
-      return
-    }
-
-    await prisma.signature.delete({ where: { id } })
-
-    res.json({ success: true, message: 'Signature removed' })
-  } catch (error) {
-    console.error('Delete signature error:', error)
-    res.status(500).json({ success: false, message: 'Server error' })
-  }
-}
-
 // ── UPDATE SIGNATURE POSITION (after drag) ────────────────
 export const updateSignature = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -160,8 +125,8 @@ export const updateSignature = async (req: AuthRequest, res: Response): Promise<
     const updated = await prisma.signature.update({
       where: { id },
       data: {
-        x: Number(x),
-        y: Number(y),
+        x:    Number(x),
+        y:    Number(y),
         page: Number(page),
       }
     })
@@ -176,7 +141,33 @@ export const updateSignature = async (req: AuthRequest, res: Response): Promise<
     res.status(500).json({ success: false, message: 'Server error' })
   }
 }
-import fetch from 'node-fetch'
+
+// ── DELETE A SIGNATURE POSITION ───────────────────────────
+export const deleteSignature = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id     = String(req.params.id)
+    const userId = req.user!.userId
+
+    const signature = await prisma.signature.findUnique({ where: { id } })
+
+    if (!signature) {
+      res.status(404).json({ success: false, message: 'Signature not found' })
+      return
+    }
+
+    if (signature.userId !== userId) {
+      res.status(403).json({ success: false, message: 'Not authorized' })
+      return
+    }
+
+    await prisma.signature.delete({ where: { id } })
+
+    res.json({ success: true, message: 'Signature removed' })
+  } catch (error) {
+    console.error('Delete signature error:', error)
+    res.status(500).json({ success: false, message: 'Server error' })
+  }
+}
 
 // ── FINALIZE — embed signatures into PDF ──────────────────
 export const finalizeDocument = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -184,11 +175,7 @@ export const finalizeDocument = async (req: AuthRequest, res: Response): Promise
     const docId  = String(req.params.docId)
     const userId = req.user!.userId
 
-    // 1. Get document from database
-    const document = await prisma.document.findUnique({
-      where: { id: docId }
-    })
-
+    const document = await prisma.document.findUnique({ where: { id: docId } })
     if (!document) {
       res.status(404).json({ success: false, message: 'Document not found' })
       return
@@ -199,66 +186,68 @@ export const finalizeDocument = async (req: AuthRequest, res: Response): Promise
       return
     }
 
-    // 2. Get all signature positions for this document
-    const signatures = await prisma.signature.findMany({
-      where: { documentId: docId }
-    })
-
+    const signatures = await prisma.signature.findMany({ where: { documentId: docId } })
     if (signatures.length === 0) {
-      res.status(400).json({
-        success: false,
-        message: 'No signatures placed on this document'
-      })
+      res.status(400).json({ success: false, message: 'No signatures placed' })
       return
     }
 
-    // 3. Download original PDF from Cloudinary as bytes
-    const pdfResponse = await fetch(document.fileUrl)
-    const pdfBytes    = await pdfResponse.arrayBuffer()
+    // Download original PDF from Cloudinary 
+    const pdfResponse = await fetch(document.fileUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    })
+    if (!pdfResponse.ok) throw new Error("Cloudinary fetch failed");
+    const pdfBytes = await pdfResponse.arrayBuffer()
 
-    // 4. Open PDF with pdf-lib
     const pdfDoc = await PDFDocument.load(pdfBytes)
     const font   = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
     const pages  = pdfDoc.getPages()
 
-    // 5. For each signature — draw it on the correct page at x,y
+    // 5. Draw each signature with precise scale math
     for (const sig of signatures) {
-      const pageIndex = sig.page - 1 // pdf-lib uses 0-based index
+      const pageIndex = sig.page - 1
       const page      = pages[pageIndex]
-
       if (!page) continue
 
-      const { height: pageHeight } = page.getSize()
+      // Get the actual internal dimensions of the PDF page
+      const { width: pageWidth, height: pageHeight } = page.getSize()
+      
+      // Calculate the difference ratio (Frontend rendered at 750px width)
+      const scaleRatio = pageWidth / 750
 
-      // pdf-lib coordinates start from BOTTOM-LEFT
-      // but our browser coordinates start from TOP-LEFT
-      // so we flip the y coordinate
-      const pdfY = pageHeight - sig.y - sig.height
+      // Scale all coordinates and dimensions down (or up) to match the PDF
+      const actualX      = sig.x * scaleRatio
+      const actualY      = sig.y * scaleRatio
+      const actualWidth  = (sig.width || 200) * scaleRatio
+      const actualHeight = (sig.height || 60) * scaleRatio
 
-      // Draw signature box border
+      // PDF Y-axis starts from the BOTTOM, so we subtract from pageHeight
+      const pdfY = pageHeight - actualY - actualHeight
+
+      // Draw signature border box scaled correctly
       page.drawRectangle({
-        x:           sig.x,
+        x:           actualX,
         y:           pdfY,
-        width:       sig.width,
-        height:      sig.height,
-        borderColor: rgb(0.24, 0.35, 0.82), // indigo color
-        borderWidth: 1.5,
+        width:       actualWidth,
+        height:      actualHeight,
+        borderColor: rgb(0.24, 0.35, 0.82),
+        borderWidth: 1.5 * scaleRatio, // Scale the border thickness too
       })
 
-      // Draw signature text inside box
+      // Draw "Digitally Signed" text
       page.drawText('Digitally Signed', {
-        x:        sig.x + 10,
-        y:        pdfY + sig.height / 2 + 5,
-        size:     12,
+        x:     actualX + (10 * scaleRatio),
+        y:     pdfY + (actualHeight / 2) + (5 * scaleRatio),
+        size:  12 * scaleRatio, // Scale the font size
         font,
-        color:    rgb(0.24, 0.35, 0.82),
+        color: rgb(0.24, 0.35, 0.82),
       })
 
-      // Draw signer name below
-      page.drawText(`Signed by: ${userId.slice(0, 8)}...`, {
-        x:     sig.x + 10,
-        y:     pdfY + 8,
-        size:  8,
+      // Draw signer ID
+      page.drawText(`Signer: ${userId.slice(0, 8)}...`, {
+        x:     actualX + (10 * scaleRatio),
+        y:     pdfY + (8 * scaleRatio),
+        size:  8 * scaleRatio,
         font,
         color: rgb(0.5, 0.5, 0.5),
       })
@@ -266,24 +255,21 @@ export const finalizeDocument = async (req: AuthRequest, res: Response): Promise
       // Draw timestamp
       const timestamp = new Date().toLocaleDateString('en-IN')
       page.drawText(timestamp, {
-        x:     sig.x + sig.width - 60,
-        y:     pdfY + 8,
-        size:  8,
+        x:     actualX + actualWidth - (65 * scaleRatio),
+        y:     pdfY + (8 * scaleRatio),
+        size:  8 * scaleRatio,
         font,
         color: rgb(0.5, 0.5, 0.5),
       })
 
-      // Mark signature as signed in database
       await prisma.signature.update({
         where: { id: sig.id },
         data:  { status: 'SIGNED' }
       })
     }
 
-    // 6. Save the modified PDF to bytes
     const signedPdfBytes = await pdfDoc.save()
 
-    // 7. Upload signed PDF to Cloudinary
     const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
       (resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
@@ -292,29 +278,26 @@ export const finalizeDocument = async (req: AuthRequest, res: Response): Promise
             resource_type: 'raw',
             format:        'pdf',
             public_id:     `signed-${docId}-${Date.now()}`,
+            access_mode:   'public',
           },
           (error, result) => {
             if (error || !result) reject(error)
             else resolve(result as { secure_url: string; public_id: string })
           }
         )
-        // Convert bytes to buffer and pipe to upload stream
-        const buffer = Buffer.from(signedPdfBytes)
-        uploadStream.end(buffer)
+        uploadStream.end(Buffer.from(signedPdfBytes))
       }
     )
 
-    // 8. Update document in database with signed PDF URL
     const updatedDoc = await prisma.document.update({
       where: { id: docId },
       data: {
-        status:  'SIGNED',
-        fileUrl: uploadResult.secure_url,
+        status:   'SIGNED',
+        fileUrl:  uploadResult.secure_url,
         publicId: uploadResult.public_id,
       }
     })
 
-    // 9. Add to audit log
     await prisma.auditLog.create({
       data: {
         documentId: docId,
@@ -330,9 +313,9 @@ export const finalizeDocument = async (req: AuthRequest, res: Response): Promise
       success: true,
       message: 'Document signed successfully',
       data: {
-        document:   updatedDoc,
-        signedUrl:  uploadResult.secure_url,
-        signatures: signatures.length,
+        document:        updatedDoc,
+        signedUrl:       uploadResult.secure_url,
+        signaturesCount: signatures.length,
       }
     })
   } catch (error) {
