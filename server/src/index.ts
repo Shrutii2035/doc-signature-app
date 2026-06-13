@@ -9,10 +9,15 @@ import signatureRoutes from './routes/signatures'
 
 const app = express()
 const PORT = process.env.PORT || 5000
+const allowedOrigins = [
+  'http://localhost:5173', // For when you are coding locally
+  'https://doc-signature-app.vercel.app', //  main Vercel domain
+  'https://doc-signature-cbi00cu1x-shruti-pawar-s-projects.vercel.app' // The exact URL from error!
+];
 
 app.use(cors({
-  origin: 'https://doc-signature-app.vercel.app', // Vercel URL 
-  credentials: true, // Required to send cookies and authorization headers
+  origin: allowedOrigins,
+  credentials: true, 
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
