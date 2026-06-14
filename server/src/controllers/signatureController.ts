@@ -5,7 +5,7 @@ import { AuthRequest }                     from '../middleware/auth'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import fetch                               from 'node-fetch'
 
-// ── SAVE SIGNATURE POSITION ───────────────────────────────
+// ── SAVE SIGNATURE POSITION ───
 export const saveSignature = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.userId
