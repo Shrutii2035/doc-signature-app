@@ -1,11 +1,10 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://doc-signature-app-production.up.railway.app/api',
-  withCredentials: true, // sends cookies automatically
-});
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  withCredentials: true,
+})
 
-// Attach token to every request automatically
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken')
   if (token) {
@@ -14,7 +13,6 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// If token expired, redirect to login
 api.interceptors.response.use(
   (res) => res,
   (err) => {
