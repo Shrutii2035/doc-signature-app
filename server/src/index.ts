@@ -9,14 +9,31 @@ import signatureRoutes from './routes/signatures'
 
 const app = express()
 const PORT = process.env.PORT || 5000
-const allowedOrigins = [
-  'http://localhost:5173', 'http://localhost:5174' , 'http://localhost:5176' ,  // For when you are coding locally
-  'https://doc-signature-app.vercel.app', //  main Vercel domain
- 
+// Define your fixed primary domains
+const primaryOrigins = [
+  'http://localhost:5173', 'http://localhost:5174',
+  'https://doc-signature-app.vercel.app'
 ];
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // 1. Allow server-to-server or tools like Postman (where origin is undefined)
+    if (!origin) return callback(null, true);
+
+    // 2. Allow our main domains (localhost and production)
+    if (primaryOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // 3. AUTOMATIC MATCH: Allow any Vercel preview domain that belongs to your project
+    // This looks for domains ending in '.vercel.app' that contain your project identity
+    if (origin.endsWith('.vercel.app') && origin.includes('doc-signature')) {
+      return callback(null, true);
+    }
+
+    // Block anything else for security
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true, 
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
