@@ -11,7 +11,7 @@ const app = express()
 const PORT = process.env.PORT || 5000
 // Define your fixed primary domains
 const primaryOrigins = [
-  'http://localhost:5173', 'http://localhost:5174',
+  'http://localhost:5173', 'http://localhost:5174', "http://localhost:8080",
   'https://doc-signature-app.vercel.app'
 ];
 
