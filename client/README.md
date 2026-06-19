@@ -1,73 +1,178 @@
-# React + TypeScript + Vite
+# ✍️ DocSign — Document Signature App
+A secure, full-stack web application where users can upload PDFs, place digital signatures, and generate legally traceable signed documents — built with modern enterprise-grade technologies.
+---
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# ✨ Features
 
-Currently, two official plugins are available:
+🔐 Secure Authentication
+User registration and login
+JWT-based authentication with HTTP-only cookies
+Secure route protection and session management
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+# 📄 Document Management
 
-## React Compiler
+Upload documents and images securely
+Cloud storage integration via Cloudinary
+View and manage previously uploaded documents
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# 🖋️ Digital Signatures
 
-## Expanding the ESLint configuration
+Apply digital signatures to documents
+Store signature history and metadata securely
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# 📱 Modern UI/UX
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Fully responsive design for desktop and mobile
+Seamless API communication via Axios with interceptors
+Built with a lightning-fast Vite + React development environment
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 🛠 Tech StackLayer
+
+Layer,            Technology
+Frontend-     "React, TypeScript, Vite"
+Backend-     "Node.js, Express.js, TypeScript"
+Database-     "PostgreSQL"
+Auth-       JSON Web Tokens (JWT) & Cookies
+Storage-      Cloudinary
+Deployment-   Vercel (Frontend) & Railway (Backend)
+
+---
+
+# 📁 Project Structure
+
+doc-signature-app/
+├── client/                     # Frontend React Application
+│   ├── src/
+│   │   ├── components/         # Reusable UI components
+│   │   ├── lib/
+│   │   │   └── axios.ts        # Axios instance with interceptors
+│   │   ├── pages/              # Main route pages (Login, Register, Dashboard)
+│   │   ├── App.tsx             # Main app component
+│   │   └── main.tsx            # React entry point
+│   ├── package.json
+│   └── vite.config.ts
+├── server/                     # Backend Express Application
+│   ├── src/
+│   │   ├── controllers/        # Route logic (auth, docs, signatures)
+│   │   ├── middleware/         # Custom middleware (errorHandler, auth)
+│   │   ├── routes/             # API route definitions
+│   │   └── index.ts            # Server entry point & CORS config
+│   ├── package.json
+│   └── tsconfig.json
+├── .gitignore
+└── README.md
+
+---
+
+🗄 Database Schema
+
+| Table | Key Fields |
+|-------|-----------|
+| `User` | id, name, email, password (hashed) |
+| `Document` | id, filename, fileUrl, publicId, status, ownerId |
+| `Signature` | id, x, y, page, width, height, imageData, status, documentId |
+| `AuditLog` | id, action, ipAddress, userAgent, metadata, documentId |
+
+**Document Status:** `PENDING` → `SIGNED` → `EXPIRED`
+
+**Signature Status:** `PLACED` → `SIGNED`
+
+**Audit Actions:** `DOCUMENT_UPLOADED` · `DOCUMENT_VIEWED` · `SIGNATURE_PLACED` · `DOCUMENT_SIGNED` · `DOCUMENT_SHARED`
+
+---
+
+## 🔌 API Endpoints
+
+### Auth — `/api/auth`
+| Method | Route | Description | Protected |
+|--------|-------|-------------|-----------|
+| POST | `/register` | Create new account | No |
+| POST | `/login` | Login + get tokens | No |
+| POST | `/refresh` | Refresh access token | No |
+| POST | `/logout` | Clear refresh cookie | No |
+
+### Documents — `/api/docs`
+| Method | Route | Description | Protected |
+|--------|-------|-------------|-----------|
+| POST | `/upload` | Upload a PDF | Yes |
+| GET | `/` | List user's documents | Yes |
+| GET | `/:id` | Get single document | Yes |
+| DELETE | `/:id` | Delete document | Yes |
+
+### Signatures — `/api/signatures`
+| Method | Route | Description | Protected |
+|--------|-------|-------------|-----------|
+| POST | `/` | Save signature position | Yes |
+| GET | `/:docId` | Get document signatures | Yes |
+| PATCH | `/:id` | Update position (drag) | Yes |
+| DELETE | `/:id` | Remove signature | Yes |
+| POST | `/finalize/:docId` | Embed + export signed PDF | Yes |
+
+---
+
+## 🚢 Deployment
+
+### Backend — Railway
+1. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
+2. Select the `doc-signature-app` repo
+3. Set **Root Directory** to `server`
+4. Set **Build Command** to `npm run build`
+5. Set **Start Command** to `npm start`
+6. Add all environment variables from `server/.env`
+7. Railway generates a public URL automatically
+
+### Frontend — Vercel
+1. Go to [vercel.com](https://vercel.com) → New Project → Import from GitHub
+2. Select the `doc-signature-app` repo
+3. Set **Root Directory** to `client`
+4. Set **Build Command** to `npm run build`
+5. Set **Output Directory** to `dist`
+6. Add environment variable:
+   - `VITE_API_URL` = `https://your-railway-url.up.railway.app/api`
+7. Click Deploy ✅
+
+## 🔄 How It Works
+
+```
+1. User registers / logs in
+          ↓
+2. JWT access token → localStorage
+   Refresh token → httpOnly cookie
+          ↓
+3. User uploads a PDF
+          ↓
+4. Multer receives → Cloudinary stores → URL saved in PostgreSQL
+          ↓
+5. User opens document → react-pdf renders PDF in browser
+          ↓
+6. User draws signature on canvas → base64 image captured
+          ↓
+7. User clicks PDF → signature box placed at x, y coordinates
+          ↓
+8. User drags box to exact position → coordinates updated in DB
+          ↓
+9. User clicks "Finalize and Sign"
+          ↓
+10. Backend downloads PDF → pdf-lib embeds signature image
+    Signed PDF uploaded to Cloudinary
+    Document status updated to SIGNED
+          ↓
+11. User downloads final signed PDF ✅
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 👩‍💻 Author
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+**Shruti**
+
+- GitHub: [@Shrutii2035](https://github.com/Shrutii2035)
+- LinkedIn: [Shruti](https://linkedin.com/in/shruti)
+
+---
+
+## 📄 License
+
+This project is open source and available under the ISC License.
