@@ -178,7 +178,7 @@ const DocumentViewer = () => {
     } finally {
       setFinalizing(false)
     }
-  }
+  } 
 
   if (loading) {
     return (
